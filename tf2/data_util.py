@@ -19,6 +19,8 @@ import functools
 from absl import flags
 
 import tensorflow.compat.v2 as tf
+import tensorflow_addons as tfa
+import math
 
 FLAGS = flags.FLAGS
 
@@ -443,9 +445,191 @@ def batch_random_blur(images_list, height, width, blur_probability=0.5):
   return new_images_list
 
 
+pi = tf.constant(math.pi)
+@tf.function
+def cosfunc(x):
+  """The cosine square smoothing function"""
+  Lower = tf.square(tf.cos(pi*(x + 1/4)));
+  Upper = 1 - tf.square(tf.cos(pi*(x - 3/4)));
+  # print(tf.logical_and((x <= -1/4), (x > -3/4)).dtype)
+  fval = tf.where(tf.logical_and((x <= -1/4), (x >-3/4)), Lower, tf.zeros(1)) + \
+      tf.where(tf.logical_and((x >= 1/4), (x <= 3/4)), Upper, tf.zeros(1)) + \
+      tf.where(tf.logical_and((x < 1/4), (x > -1/4)), tf.ones(1), tf.zeros(1))
+  return fval
+
+
+@tf.function
+def rbf(ecc, N, spacing, e_o=1.0):
+  """ Number N radial basis function
+  ecc: eccentricities, tf array.  
+  N: numbering of basis function, starting from 0. 
+  spacing: log scale spacing of ring radius (deg), scalar.
+  e_o: radius of 0 string, scalar. 
+  """
+  spacing = tf.convert_to_tensor(spacing, dtype="float32")
+  e_o = tf.convert_to_tensor(e_o, dtype="float32")
+  preinput = tf.divide(tf.math.log(ecc) - (tf.math.log(e_o) + (N + 1) * spacing), spacing)
+  ecc_basis = cosfunc(preinput);
+  return ecc_basis
+
+
+@tf.function
+def fov_rbf(ecc, spacing, e_o=1.0):
+  """Initial radial basis function
+  """
+  spacing = tf.convert_to_tensor(spacing,dtype="float32")
+  e_o = tf.convert_to_tensor(e_o,dtype="float32")
+  preinput = tf.divide(tf.math.log(ecc) - tf.math.log(e_o), spacing)
+  preinput = tf.clip_by_value(preinput, tf.zeros(1), tf.ones(1)) # only clip 0 is enough.
+  ecc_basis = cosfunc(preinput);
+  return ecc_basis
+
+
+def FoveateAt(img, 
+              pnt:tuple, 
+              kerW_coef=0.04, 
+              e_o=1, 
+              N_e=5, 
+              spacing=0.3):
+  """Apply foveation transform at (x,y) coordinate `pnt` to `img`
+
+  Args: 
+    kerW_coef: how gaussian filtering kernel std scale as a function of eccentricity 
+    e_o: eccentricity of the initial ring belt
+    spacing: log scale spacing between eccentricity of ring belts. 
+    N_e: Number of ring belts in total. if None, it will calculate the N_e s.t. the whole image is covered by ring belts.
+    bdr: width (in pixel) of border region that forbid sampling (bias foveation point to be in the center of img)
+  """
+  H, W = img.shape[0], img.shape[1] # if this is fixed then these two steps could be saved
+  XX, YY = tf.meshgrid(tf.range(W),tf.range(H))
+  deg_per_pix = 0.06#20/math.sqrt(H**2+W**2); #FixMe
+  # pixel coordinate of fixation point.
+  xid, yid = pnt
+  D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
+  D2fov_deg = D2fov * deg_per_pix
+  # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]) # maximal deviation at 4 corner
+  # maxecc = tf.reduce_max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]])
+  maxecc = max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]])
+  # e_r = maxecc; # 15
+  if N_e is None:
+    N_e = np.ceil((np.log(maxecc)-np.log(e_o))/spacing+1).astype("int32")
+  rbf_basis = fov_rbf(D2fov_deg, spacing, e_o)
+  finalimg = tf.expand_dims(rbf_basis,-1)*img
+  for N in range(N_e):
+    rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
+    mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
+    kerW = kerW_coef * mean_dev / deg_per_pix
+    kerSz = int(kerW * 3)
+    img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
+    finalimg = finalimg + tf.expand_dims(rbf_basis,-1)*img_gsft
+  return finalimg 
+
+
+def random_foveation(img, 
+                    kerW_coef=0.04, 
+                    e_o=1, 
+                    N_e=None, 
+                    spacing=0.3, 
+                    bdr=12):
+  """Randomly apply `pntN` foveation transform to `img`. points are sampled uniformly in the center of 
+  image after masking out the border `bdr` pixels.
+
+  Args: 
+    kerW_coef: how gaussian filtering kernel std scale as a function of eccentricity 
+    e_o: eccentricity of the initial ring belt
+    spacing: log scale spacing between eccentricity of ring belts. 
+    N_e: Number of ring belts in total. if None, it will calculate the N_e s.t. the whole image is covered by ring belts.
+    bdr: width (in pixel) of border region that forbid sampling (bias foveation point to be in the center of img)
+  """
+  H, W = img.shape[0], img.shape[1] # if this is fixed then these two steps could be saved
+  XX, YY = tf.meshgrid(tf.range(W),tf.range(H))
+  deg_per_pix = 0.03 #20/math.sqrt(H**2+W**2); # FIXME! degree to pixel transforms 
+  finimg_list = []
+  xids = tf.random.uniform(shape=[1,], minval=bdr, maxval=W-bdr, dtype=tf.int32)
+  yids = tf.random.uniform(shape=[1,], minval=bdr, maxval=H-bdr, dtype=tf.int32)
+  for it in range(1):
+    xid, yid = xids[it], yids[it] # pixel coordinate of fixation point.
+    D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
+    D2fov_deg = D2fov * deg_per_pix
+    # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1])
+    # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]) # maximal deviation at 4 corner
+    # maxecc = tf.reduce_max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]]).eval() # just cannot get this work
+    maxecc = 10
+    e_r = maxecc; # 15
+    if N_e is None:
+      N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing+1)) #.astype("int32"
+      # N_e = tf.cast(tf.math.ceil((tf.math.log(maxecc)-tf.math.log(e_o))/spacing+1),tf.int32) # this is problematic
+    # spacing = tf.convert_to_tensor((math.log(e_r) - math.log(e_o)) / N_e);
+    # spacing = tf.convert_to_tensor(spacing, dtype="float32");
+    rbf_basis = fov_rbf(D2fov_deg,spacing,e_o)
+    finalimg = tf.expand_dims(rbf_basis, -1)*img
+    for N in range(N_e):
+      rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
+      mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
+      kerW = kerW_coef * mean_dev / deg_per_pix
+      kerSz = int(kerW * 3)
+      img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
+      finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
+  #   finimg_list.append(finalimg)
+  # finimgs = tf.stack(finimg_list)
+  return finalimg
+
+
+def random_foveation_multiple(img, 
+                    pntN:int =1, 
+                    kerW_coef=0.04, 
+                    e_o=1, 
+                    N_e=None, 
+                    spacing=0.3, 
+                    bdr=12):
+  """Randomly apply `pntN` foveation transform to `img`. points are sampled uniformly in the center of 
+  image after masking out the border `bdr` pixels.
+
+  Args: 
+    kerW_coef: how gaussian filtering kernel std scale as a function of eccentricity 
+    e_o: eccentricity of the initial ring belt
+    spacing: log scale spacing between eccentricity of ring belts. 
+    N_e: Number of ring belts in total. if None, it will calculate the N_e s.t. the whole image is covered by ring belts.
+    bdr: width (in pixel) of border region that forbid sampling (bias foveation point to be in the center of img)
+  """
+  H, W = img.shape[0], img.shape[1] # if this is fixed then these two steps could be saved
+  XX, YY = tf.meshgrid(tf.range(W),tf.range(H))
+  deg_per_pix = 0.03 #20/math.sqrt(H**2+W**2); # FIXME! degree to pixel transforms 
+  finimg_list = []
+  xids = tf.random.uniform(shape=[pntN,], minval=bdr, maxval=W-bdr, dtype=tf.int32)
+  yids = tf.random.uniform(shape=[pntN,], minval=bdr, maxval=H-bdr, dtype=tf.int32)
+  for it in range(pntN):
+    xid, yid = xids[it], yids[it] # pixel coordinate of fixation point.
+    D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
+    D2fov_deg = D2fov * deg_per_pix
+    # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1])
+    # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]) # maximal deviation at 4 corner
+    # maxecc = tf.reduce_max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]]).eval() # just cannot get this work
+    maxecc = 10
+    e_r = maxecc; # 15
+    if N_e is None:
+      N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing+1)) #.astype("int32"
+      # N_e = tf.cast(tf.math.ceil((tf.math.log(maxecc)-tf.math.log(e_o))/spacing+1),tf.int32) # this is problematic
+    # spacing = tf.convert_to_tensor((math.log(e_r) - math.log(e_o)) / N_e);
+    # spacing = tf.convert_to_tensor(spacing, dtype="float32");
+    rbf_basis = fov_rbf(D2fov_deg,spacing,e_o)
+    finalimg = tf.expand_dims(rbf_basis, -1)*img
+    for N in range(N_e):
+      rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
+      mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
+      kerW = kerW_coef * mean_dev / deg_per_pix
+      kerSz = int(kerW * 3)
+      img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
+      finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
+    finimg_list.append(finalimg)
+  finimgs = tf.stack(finimg_list)
+  return finimgs
+
+
 def preprocess_for_train(image,
                          height,
                          width,
+                         foveation=True,
                          color_distort=True,
                          crop=True,
                          flip=True,
@@ -456,6 +640,7 @@ def preprocess_for_train(image,
     image: `Tensor` representing an image of arbitrary size.
     height: Height of output image.
     width: Width of output image.
+    foveation: Random foveation to the image. 
     color_distort: Whether to apply the color distortion.
     crop: Whether to crop the image.
     flip: Whether or not to flip left and right of an image.
@@ -465,6 +650,8 @@ def preprocess_for_train(image,
   Returns:
     A preprocessed image `Tensor`.
   """
+  if foveation:
+    image = random_foveation(image, )
   if crop:
     image = random_crop_with_resize(image, height, width)
   if flip:
@@ -472,7 +659,7 @@ def preprocess_for_train(image,
   if color_distort:
     image = random_color_jitter(image, strength=FLAGS.color_jitter_strength,
                                 impl=impl)
-  image = tf.reshape(image, [height, width, 3])
+  image = tf.reshape(image, [height, width, 3]) # this is single image augmentation
   image = tf.clip_by_value(image, 0., 1.)
   return image
 
@@ -491,7 +678,7 @@ def preprocess_for_eval(image, height, width, crop=True):
   """
   if crop:
     image = center_crop(image, height, width, crop_proportion=CROP_PROPORTION)
-  image = tf.reshape(image, [height, width, 3])
+  image = tf.reshape(image, [height, width, 3]) # this is single image augmentation
   image = tf.clip_by_value(image, 0., 1.)
   return image
 

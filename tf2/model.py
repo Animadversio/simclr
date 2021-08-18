@@ -252,7 +252,7 @@ class Model(tf.keras.models.Model):
     # Split channels, and optionally apply extra batched augmentation.
     features_list = tf.split(
         features, num_or_size_splits=num_transforms, axis=-1)
-    if FLAGS.use_blur and training and FLAGS.train_mode == 'pretrain':
+    if FLAGS.use_blur and training and FLAGS.train_mode == 'pretrain': # Note blur is applied to the features tensors
       features_list = data_util.batch_random_blur(features_list,
                                                   FLAGS.image_size,
                                                   FLAGS.image_size)
