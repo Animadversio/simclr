@@ -547,29 +547,29 @@ def random_foveation(img,
   finimg_list = []
   xids = tf.random.uniform(shape=[1,], minval=bdr, maxval=W-bdr, dtype=tf.int32)
   yids = tf.random.uniform(shape=[1,], minval=bdr, maxval=H-bdr, dtype=tf.int32)
-  for it in range(1):
-    xid, yid = xids[it], yids[it] # pixel coordinate of fixation point.
-    D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
-    D2fov_deg = D2fov * deg_per_pix
-    # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1])
-    # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]) # maximal deviation at 4 corner
-    # maxecc = tf.reduce_max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]]).eval() # just cannot get this work
-    maxecc = 10
-    e_r = maxecc; # 15
-    if N_e is None:
-      N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing+1)) #.astype("int32"
-      # N_e = tf.cast(tf.math.ceil((tf.math.log(maxecc)-tf.math.log(e_o))/spacing+1),tf.int32) # this is problematic
-    # spacing = tf.convert_to_tensor((math.log(e_r) - math.log(e_o)) / N_e);
-    # spacing = tf.convert_to_tensor(spacing, dtype="float32");
-    rbf_basis = fov_rbf(D2fov_deg,spacing,e_o)
-    finalimg = tf.expand_dims(rbf_basis, -1)*img
-    for N in range(N_e):
-      rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
-      mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
-      kerW = kerW_coef * mean_dev / deg_per_pix
-      kerSz = int(kerW * 3)
-      img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
-      finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
+  xid, yid = xids[0], yids[0] # pixel coordinate of fixation point.
+  D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
+  D2fov_deg = D2fov * deg_per_pix
+  # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1])
+  # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]) # maximal deviation at 4 corner
+  # maxecc = tf.reduce_max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]]).eval() # just cannot get this work
+  # maxecc = 10
+  maxecc = math.sqrt(max(xid, W-xid)**2 + max(yid, H-yid)**2) * deg_per_pix
+  e_r = maxecc; # 15
+  if N_e is None:
+    # N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing+1)) #.astype("int32"
+    N_e = tf.cast(tf.math.ceil((tf.math.log(maxecc)-tf.math.log(e_o))/spacing+1),tf.int32) # this is problematic
+  # spacing = tf.convert_to_tensor((math.log(e_r) - math.log(e_o)) / N_e);
+  # spacing = tf.convert_to_tensor(spacing, dtype="float32");
+  rbf_basis = fov_rbf(D2fov_deg,spacing,e_o)
+  finalimg = tf.expand_dims(rbf_basis, -1)*img
+  for N in range(N_e):
+    rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
+    mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
+    kerW = kerW_coef * mean_dev / deg_per_pix
+    kerSz = int(kerW * 3)
+    img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
+    finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
   #   finimg_list.append(finalimg)
   # finimgs = tf.stack(finimg_list)
   return finalimg
