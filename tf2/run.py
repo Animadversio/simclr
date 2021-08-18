@@ -237,6 +237,13 @@ flags.DEFINE_boolean(
     'use_blur', True,
     'Whether or not to use Gaussian blur for augmentation during pretraining.')
 
+flags.DEFINE_multi_float(
+    'fov_area_range', [0.05, 1.0], 
+    'Two float number list, the range of fovea area as a fraction of the image area', short_name='FAR')
+
+flags.DEFINE_float(
+    'blur_scaling', 0.04, 
+    'scaling of blur kernel as a function of the eccentricity', short_name='BS')
 
 def get_salient_tensors_dict(include_projection_head):
   """Returns a dictionary of tensors."""
