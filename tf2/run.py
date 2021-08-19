@@ -237,6 +237,10 @@ flags.DEFINE_boolean(
     'use_blur', True,
     'Whether or not to use Gaussian blur for augmentation during pretraining.')
 
+flags.DEFINE_boolean(
+    'foveation', True,
+    'Whether or not to use Foveation transform for augmentation during pretraining. (this transform comes last.)')
+
 flags.DEFINE_multi_float(
     'fov_area_range', [0.05, 1.0], 
     'Two float number list, the range of fovea area as a fraction of the image area', short_name='FAR')

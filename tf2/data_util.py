@@ -618,7 +618,7 @@ def FoveateAt(img, height:int, width:int,
   finalimg = tf.expand_dims(rbf_basis, -1)*img
   for N in range(N_e):
     rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
-    mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
+    mean_dev = (math.log(e_o) + (N + 1) * spacing) # math.exp
     # mean_dev = tf.exp(tf.math.log(e_o) + (tf.cast(N, tf.float32) + 1) * spacing)
     kerW = kerW_coef * mean_dev / deg_per_pix
     kerSz = int(kerW * 3)
@@ -630,16 +630,16 @@ def FoveateAt(img, height:int, width:int,
 
 import random
 def random_foveation(img, height, width, bdr=12, 
-                    fov_area_ratio=0.1, 
+                    fov_area_ratio=0.1, kerW_coef=0.04, 
                     e_o=None, 
-                    spacing=0.3,
-                    kerW_coef=0.04, 
                     N_e=None, 
+                    spacing=0.3,
                     deg_per_pix=0.03,):
   """Randomly apply `pntN` foveation transform to `img`. points are sampled uniformly in the center of 
   image after masking out the border `bdr` pixels.
 
   Args: 
+    fov_area_ratio: tuple of range of area ratio; one float of ratio or None.
     kerW_coef: how gaussian filtering kernel std scale as a function of eccentricity 
     e_o: eccentricity of the initial ring belt
     spacing: log scale spacing between eccentricity of ring belts. 
@@ -694,9 +694,6 @@ def preprocess_for_train(image,
   Returns:
     A preprocessed image `Tensor`.
   """
-  if foveation:
-    image = random_foveation(image, height, width, \
-        kerW_coef=FLAGS.blur_scaling, fov_area_ratio=FLAGS.fov_area_range)
   if crop:
     image = random_crop_with_resize(image, height, width)
   if flip:
@@ -705,6 +702,9 @@ def preprocess_for_train(image,
     image = random_color_jitter(image, strength=FLAGS.color_jitter_strength,
                                 impl=impl)
   image = tf.reshape(image, [height, width, 3]) # this is single image augmentation
+  if foveation:
+    image = random_foveation(image, height, width, \
+        kerW_coef=FLAGS.blur_scaling, fov_area_ratio=FLAGS.fov_area_range)
   image = tf.clip_by_value(image, 0., 1.)
   return image
 
@@ -746,6 +746,6 @@ def preprocess_image(image, height, width, is_training=False,
   """
   image = tf.image.convert_image_dtype(image, dtype=tf.float32)
   if is_training:
-    return preprocess_for_train(image, height, width, color_distort)
+    return preprocess_for_train(image, height, width, color_distort, FLAGS.foveation)
   else:
     return preprocess_for_eval(image, height, width, test_crop)
