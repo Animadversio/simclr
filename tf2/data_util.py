@@ -525,11 +525,12 @@ def FoveateAt(img,
   return finalimg 
 
 
-def random_foveation(img, 
+def random_foveation(img, height, width, 
                     kerW_coef=0.04, 
                     e_o=1, 
                     N_e=None, 
                     spacing=0.3, 
+                    deg_per_pix = 0.03,
                     bdr=12):
   """Randomly apply `pntN` foveation transform to `img`. points are sampled uniformly in the center of 
   image after masking out the border `bdr` pixels.
@@ -541,26 +542,24 @@ def random_foveation(img,
     N_e: Number of ring belts in total. if None, it will calculate the N_e s.t. the whole image is covered by ring belts.
     bdr: width (in pixel) of border region that forbid sampling (bias foveation point to be in the center of img)
   """
-  H, W = img.shape[0], img.shape[1] # if this is fixed then these two steps could be saved
+  # H, W = img.shape[0], img.shape[1] # if this is fixed then these two steps could be saved
+  H, W = height, width
   XX, YY = tf.meshgrid(tf.range(W),tf.range(H))
-  deg_per_pix = 0.03 #20/math.sqrt(H**2+W**2); # FIXME! degree to pixel transforms 
+  # deg_per_pix = 20/math.sqrt(H**2+W**2); # FIXME! degree to pixel transforms 
   finimg_list = []
   xids = tf.random.uniform(shape=[1,], minval=bdr, maxval=W-bdr, dtype=tf.int32)
   yids = tf.random.uniform(shape=[1,], minval=bdr, maxval=H-bdr, dtype=tf.int32)
   xid, yid = xids[0], yids[0] # pixel coordinate of fixation point.
   D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
   D2fov_deg = D2fov * deg_per_pix
-  # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1])
-  # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]) # maximal deviation at 4 corner
-  # maxecc = tf.reduce_max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]]).eval() # just cannot get this work
-  # maxecc = 10
-  # maxecc = math.sqrt(max(xid, W-xid)**2 + max(yid, H-yid)**2) * deg_per_pix
-  maxecc = tf.sqrt(tf.cast(tf.square(tf.maximum(xid, W-xid)) + tf.square(tf.maximum(yid, H-yid)),tf.float32)) * deg_per_pix
+  # maxecc = 10 $ fixed version
+  maxecc = math.sqrt(max(xid, W-xid)**2 + max(yid, H-yid)**2) * deg_per_pix # none tensor version
+  # maxecc = tf.sqrt(tf.cast(tf.square(tf.maximum(xid, W-xid)) + tf.square(tf.maximum(yid, H-yid)),tf.float32)) * deg_per_pix
   e_r = maxecc; # 15
   if N_e is None:
-    # N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing+1)) #.astype("int32"
-    N_e = tf.cast(tf.math.ceil(\
-        (tf.math.log(maxecc)-tf.math.log(tf.convert_to_tensor(e_o,dtype=tf.float32)))/spacing),tf.int32) # this is problematic
+    N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing+1)) #.astype("int32"
+    # N_e = tf.cast(tf.math.ceil(\
+    #     (tf.math.log(maxecc)-tf.math.log(tf.convert_to_tensor(e_o,dtype=tf.float32)))/spacing),tf.int32) # this is problematic
   # spacing = tf.convert_to_tensor((math.log(e_r) - math.log(e_o)) / N_e);
   spacing = tf.convert_to_tensor(spacing, dtype="float32");
   e_o = tf.convert_to_tensor(e_o, dtype="float32");
@@ -568,11 +567,11 @@ def random_foveation(img,
   finalimg = tf.expand_dims(rbf_basis, -1)*img
   for N in range(N_e):
     rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
-    # mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
-    mean_dev = tf.exp(tf.math.log(e_o) + (tf.cast(N, tf.float32) + 1) * spacing)
+    mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
+    # mean_dev = tf.exp(tf.math.log(e_o) + (tf.cast(N, tf.float32) + 1) * spacing)
     kerW = kerW_coef * mean_dev / deg_per_pix
-    # kerSz = int(kerW * 3)
-    kerSz = tf.cast(kerW * 3, tf.int32)
+    kerSz = int(kerW * 3)
+    # kerSz = tf.cast(kerW * 3, tf.int32)
     img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
     finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
   #   finimg_list.append(finalimg)
@@ -656,7 +655,7 @@ def preprocess_for_train(image,
     A preprocessed image `Tensor`.
   """
   if foveation:
-    image = random_foveation(image, )
+    image = random_foveation(image, height, width)
   if crop:
     image = random_crop_with_resize(image, height, width)
   if flip:
