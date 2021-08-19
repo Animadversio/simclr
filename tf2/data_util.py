@@ -550,9 +550,9 @@ def random_foveation(img, height, width,
   finimg_list = []
   # xids = tf.random.uniform(shape=[1,], minval=bdr, maxval=W-bdr, dtype=tf.int32)
   # yids = tf.random.uniform(shape=[1,], minval=bdr, maxval=H-bdr, dtype=tf.int32)
-  xids = random.randint(bdr, W-bdr)
-  yids = random.randint(bdr, H-bdr)
-  xid, yid = xids[0], yids[0] # pixel coordinate of fixation point.
+  # xid, yid = xids[0], yids[0] # pixel coordinate of fixation point.
+  xid = random.randint(bdr, W-bdr)
+  yid = random.randint(bdr, H-bdr)
   D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
   D2fov_deg = D2fov * deg_per_pix
   # maxecc = 10 $ fixed version
