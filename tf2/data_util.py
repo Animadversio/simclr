@@ -555,7 +555,7 @@ def random_foveation(img,
   # maxecc = tf.reduce_max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]]).eval() # just cannot get this work
   # maxecc = 10
   # maxecc = math.sqrt(max(xid, W-xid)**2 + max(yid, H-yid)**2) * deg_per_pix
-  maxecc = tf.sqrt(tf.square(tf.maximum(xid, W-xid)) + tf.square(tf.maximum(yid, H-yid))) * deg_per_pix
+  maxecc = tf.sqrt(tf.cast(tf.square(tf.maximum(xid, W-xid)) + tf.square(tf.maximum(yid, H-yid)),tf.float32)) * deg_per_pix
   e_r = maxecc; # 15
   if N_e is None:
     # N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing+1)) #.astype("int32"
