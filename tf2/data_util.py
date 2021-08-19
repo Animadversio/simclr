@@ -559,7 +559,8 @@ def random_foveation(img,
   e_r = maxecc; # 15
   if N_e is None:
     # N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing+1)) #.astype("int32"
-    N_e = tf.cast(tf.math.ceil((tf.math.log(maxecc)-tf.math.log(e_o))/spacing+1),tf.int32) # this is problematic
+    N_e = tf.cast(tf.math.ceil(\
+        (tf.math.log(maxecc)-tf.math.log(tf.convert_to_tensor(e_o,dtype=tf.float32)))/spacing),tf.int32) # this is problematic
   # spacing = tf.convert_to_tensor((math.log(e_r) - math.log(e_o)) / N_e);
   # spacing = tf.convert_to_tensor(spacing, dtype="float32");
   rbf_basis = fov_rbf(D2fov_deg,spacing,e_o)
