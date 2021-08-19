@@ -466,8 +466,8 @@ def rbf(ecc, N, spacing, e_o=1.0):
   spacing: log scale spacing of ring radius (deg), scalar.
   e_o: radius of 0 string, scalar. 
   """
-  spacing = tf.convert_to_tensor(spacing, dtype="float32")
-  e_o = tf.convert_to_tensor(e_o, dtype="float32")
+  spacing = tf.convert_to_tensor(spacing, dtype=tf.float32)
+  e_o = tf.convert_to_tensor(e_o, dtype=tf.float32)
   preinput = tf.divide(tf.math.log(ecc) - (tf.math.log(e_o) + (tf.cast(N, tf.float32) + 1) * spacing), spacing)
   ecc_basis = cosfunc(preinput);
   return ecc_basis
@@ -562,7 +562,8 @@ def random_foveation(img,
     N_e = tf.cast(tf.math.ceil(\
         (tf.math.log(maxecc)-tf.math.log(tf.convert_to_tensor(e_o,dtype=tf.float32)))/spacing),tf.int32) # this is problematic
   # spacing = tf.convert_to_tensor((math.log(e_r) - math.log(e_o)) / N_e);
-  # spacing = tf.convert_to_tensor(spacing, dtype="float32");
+  spacing = tf.convert_to_tensor(spacing, dtype="float32");
+  e_o = tf.convert_to_tensor(e_o, dtype="float32");
   rbf_basis = fov_rbf(D2fov_deg,spacing,e_o)
   finalimg = tf.expand_dims(rbf_basis, -1)*img
   for N in range(N_e):
