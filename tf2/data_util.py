@@ -468,7 +468,7 @@ def rbf(ecc, N, spacing, e_o=1.0):
   """
   spacing = tf.convert_to_tensor(spacing, dtype="float32")
   e_o = tf.convert_to_tensor(e_o, dtype="float32")
-  preinput = tf.divide(tf.math.log(ecc) - (tf.math.log(e_o) + (N + 1) * spacing), spacing)
+  preinput = tf.divide(tf.math.log(ecc) - (tf.math.log(e_o) + (tf.cast(N, tf.float32) + 1) * spacing), spacing)
   ecc_basis = cosfunc(preinput);
   return ecc_basis
 
