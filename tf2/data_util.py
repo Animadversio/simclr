@@ -618,7 +618,7 @@ def FoveateAt(img, height:int, width:int,
   finalimg = tf.expand_dims(rbf_basis, -1)*img
   for N in range(N_e):
     rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
-    mean_dev = (math.log(e_o) + (N + 1) * spacing) # math.exp
+    mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing) 
     # mean_dev = tf.exp(tf.math.log(e_o) + (tf.cast(N, tf.float32) + 1) * spacing)
     kerW = kerW_coef * mean_dev / deg_per_pix
     kerSz = int(kerW * 3)
