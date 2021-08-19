@@ -567,9 +567,11 @@ def random_foveation(img,
   finalimg = tf.expand_dims(rbf_basis, -1)*img
   for N in range(N_e):
     rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
-    mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
+    # mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
+    mean_dev = tf.exp(tf.math.log(e_o) + (tf.cast(N, tf.float32) + 1) * spacing)
     kerW = kerW_coef * mean_dev / deg_per_pix
-    kerSz = int(kerW * 3)
+    # kerSz = int(kerW * 3)
+    kerSz = tf.cast(kerW * 3, tf.int32)
     img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
     finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
   #   finimg_list.append(finalimg)
