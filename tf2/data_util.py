@@ -624,7 +624,7 @@ def FoveateAt(img, height:int, width:int,
     kerSz = int(kerW * 3)
     # kerSz = tf.cast(kerW * 3, tf.int32)
     img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
-    finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
+    finalimg = finalimg + tf.expand_dims(rbf_basis, -1) * img_gsft
   return finalimg 
 
 
