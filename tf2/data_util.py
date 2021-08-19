@@ -630,7 +630,6 @@ def FoveateAt(img, height:int, width:int,
 
 import random
 def random_foveation(img, height, width, bdr=12, 
-                    kerW_coef=0.04,
                     fov_area_ratio=0.1, 
                     e_o=None, 
                     spacing=0.3,
@@ -656,7 +655,7 @@ def random_foveation(img, height, width, bdr=12,
       fov_area_r = random.uniform(fov_area_ratio[0], fov_area_ratio[1]) # should this ratio be uniform? 
     else: 
       fov_area_r = fov_area_ratio
-    fov_rad = math.sqrt(H * W * fov_area_r / math.pi)
+    fov_rad = max(1,math.sqrt(H * W * fov_area_r / math.pi))
     fov_rad_deg = fov_rad * deg_per_pix
   else: 
     if e_o is not None:
