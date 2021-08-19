@@ -525,6 +525,7 @@ def FoveateAt(img,
   return finalimg 
 
 
+import random
 def random_foveation(img, height, width, 
                     kerW_coef=0.04, 
                     e_o=1, 
@@ -547,8 +548,10 @@ def random_foveation(img, height, width,
   XX, YY = tf.meshgrid(tf.range(W),tf.range(H))
   # deg_per_pix = 20/math.sqrt(H**2+W**2); # FIXME! degree to pixel transforms 
   finimg_list = []
-  xids = tf.random.uniform(shape=[1,], minval=bdr, maxval=W-bdr, dtype=tf.int32)
-  yids = tf.random.uniform(shape=[1,], minval=bdr, maxval=H-bdr, dtype=tf.int32)
+  # xids = tf.random.uniform(shape=[1,], minval=bdr, maxval=W-bdr, dtype=tf.int32)
+  # yids = tf.random.uniform(shape=[1,], minval=bdr, maxval=H-bdr, dtype=tf.int32)
+  xids = random.randint(bdr, W-bdr)
+  yids = random.randint(bdr, H-bdr)
   xid, yid = xids[0], yids[0] # pixel coordinate of fixation point.
   D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
   D2fov_deg = D2fov * deg_per_pix
