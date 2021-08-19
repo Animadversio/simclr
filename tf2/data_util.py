@@ -485,12 +485,117 @@ def fov_rbf(ecc, spacing, e_o=1.0):
   return ecc_basis
 
 
-def FoveateAt(img, 
+# def random_foveation(img, height, width, 
+  #                   kerW_coef=0.04, 
+  #                   e_o=1, 
+  #                   N_e=None, 
+  #                   spacing=0.3, 
+  #                   deg_per_pix = 0.03,
+  #                   bdr=12):
+  # """Randomly apply `pntN` foveation transform to `img`. points are sampled uniformly in the center of 
+  # image after masking out the border `bdr` pixels.
+
+  # Args: 
+  #   kerW_coef: how gaussian filtering kernel std scale as a function of eccentricity 
+  #   e_o: eccentricity of the initial ring belt
+  #   spacing: log scale spacing between eccentricity of ring belts. 
+  #   N_e: Number of ring belts in total. if None, it will calculate the N_e s.t. the whole image is covered by ring belts.
+  #   bdr: width (in pixel) of border region that forbid sampling (bias foveation point to be in the center of img)
+  # """
+  # # H, W = img.shape[0], img.shape[1] # if this is fixed then these two steps could be saved
+  # H, W = height, width
+  # XX, YY = tf.meshgrid(tf.range(W),tf.range(H))
+  # # deg_per_pix = 20/math.sqrt(H**2+W**2); # FIXME! degree to pixel transforms 
+  # # xids = tf.random.uniform(shape=[1,], minval=bdr, maxval=W-bdr, dtype=tf.int32) # TF version
+  # # yids = tf.random.uniform(shape=[1,], minval=bdr, maxval=H-bdr, dtype=tf.int32)
+  # # xid, yid = xids[0], yids[0] # pixel coordinate of fixation point.
+  # xid = random.randint(bdr, W-bdr)
+  # yid = random.randint(bdr, H-bdr)
+  # D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
+  # D2fov_deg = D2fov * deg_per_pix
+  # # maxecc = 10 $ fixed version
+  # maxecc = math.sqrt(max(xid, W-xid)**2 + max(yid, H-yid)**2) * deg_per_pix # none tensor version
+  # # maxecc = tf.sqrt(tf.cast(tf.square(tf.maximum(xid, W-xid)) + tf.square(tf.maximum(yid, H-yid)),tf.float32)) * deg_per_pix
+  # e_r = maxecc; # 15
+  # if N_e is None:
+  #   N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing)) #.astype("int32"
+  #   # N_e = tf.cast(tf.math.ceil(\
+  #   #     (tf.math.log(maxecc)-tf.math.log(tf.convert_to_tensor(e_o,dtype=tf.float32)))/spacing),tf.int32) # this is problematic
+  # # spacing = tf.convert_to_tensor((math.log(e_r) - math.log(e_o)) / N_e);
+  # # spacing = tf.convert_to_tensor(spacing, dtype="float32");
+  # # e_o = tf.convert_to_tensor(e_o, dtype="float32");
+  # rbf_basis = fov_rbf(D2fov_deg,spacing,e_o)
+  # finalimg = tf.expand_dims(rbf_basis, -1)*img
+  # for N in range(N_e):
+  #   rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
+  #   mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
+  #   # mean_dev = tf.exp(tf.math.log(e_o) + (tf.cast(N, tf.float32) + 1) * spacing)
+  #   kerW = kerW_coef * mean_dev / deg_per_pix
+  #   kerSz = int(kerW * 3)
+  #   # kerSz = tf.cast(kerW * 3, tf.int32)
+  #   img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
+  #   finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
+  # return finalimg
+
+
+# def random_foveation_multiple(img, 
+#                     pntN:int =1, 
+#                     kerW_coef=0.04, 
+#                     e_o=1, 
+#                     N_e=None, 
+#                     spacing=0.3, 
+#                     bdr=12):
+#   """Randomly apply `pntN` foveation transform to `img`. points are sampled uniformly in the center of 
+#   image after masking out the border `bdr` pixels.
+
+#   Args: 
+#     kerW_coef: how gaussian filtering kernel std scale as a function of eccentricity 
+#     e_o: eccentricity of the initial ring belt
+#     spacing: log scale spacing between eccentricity of ring belts. 
+#     N_e: Number of ring belts in total. if None, it will calculate the N_e s.t. the whole image is covered by ring belts.
+#     bdr: width (in pixel) of border region that forbid sampling (bias foveation point to be in the center of img)
+#   """
+#   H, W = img.shape[0], img.shape[1] # if this is fixed then these two steps could be saved
+#   XX, YY = tf.meshgrid(tf.range(W),tf.range(H))
+#   deg_per_pix = 0.03 #20/math.sqrt(H**2+W**2); # FIXME! degree to pixel transforms 
+#   finimg_list = []
+#   xids = tf.random.uniform(shape=[pntN,], minval=bdr, maxval=W-bdr, dtype=tf.int32)
+#   yids = tf.random.uniform(shape=[pntN,], minval=bdr, maxval=H-bdr, dtype=tf.int32)
+#   for it in range(pntN):
+#     xid, yid = xids[it], yids[it] # pixel coordinate of fixation point.
+#     D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
+#     D2fov_deg = D2fov * deg_per_pix
+#     # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1])
+#     # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]) # maximal deviation at 4 corner
+#     # maxecc = tf.reduce_max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]]).eval() # just cannot get this work
+#     maxecc = 10
+#     e_r = maxecc; # 15
+#     if N_e is None:
+#       N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing+1)) #.astype("int32"
+#       # N_e = tf.cast(tf.math.ceil((tf.math.log(maxecc)-tf.math.log(e_o))/spacing+1),tf.int32) # this is problematic
+#     # spacing = tf.convert_to_tensor((math.log(e_r) - math.log(e_o)) / N_e);
+#     # spacing = tf.convert_to_tensor(spacing, dtype="float32");
+#     rbf_basis = fov_rbf(D2fov_deg,spacing,e_o)
+#     finalimg = tf.expand_dims(rbf_basis, -1)*img
+#     for N in range(N_e):
+#       rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
+#       mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
+#       kerW = kerW_coef * mean_dev / deg_per_pix
+#       kerSz = int(kerW * 3)
+#       img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
+#       finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
+#     finimg_list.append(finalimg)
+#   finimgs = tf.stack(finimg_list)
+#   return finimgs
+
+
+def FoveateAt(img, height:int, width:int, 
               pnt:tuple, 
-              kerW_coef=0.04, 
               e_o=1, 
-              N_e=5, 
-              spacing=0.3):
+              spacing=0.3,
+              kerW_coef=0.04, 
+              N_e=None, 
+              deg_per_pix=0.03,):
   """Apply foveation transform at (x,y) coordinate `pnt` to `img`
 
   Args: 
@@ -500,39 +605,38 @@ def FoveateAt(img,
     N_e: Number of ring belts in total. if None, it will calculate the N_e s.t. the whole image is covered by ring belts.
     bdr: width (in pixel) of border region that forbid sampling (bias foveation point to be in the center of img)
   """
-  H, W = img.shape[0], img.shape[1] # if this is fixed then these two steps could be saved
+  H, W = height, width
+  xid, yid = pnt[0], pnt[1]
   XX, YY = tf.meshgrid(tf.range(W),tf.range(H))
-  deg_per_pix = 0.06#20/math.sqrt(H**2+W**2); #FixMe
-  # pixel coordinate of fixation point.
-  xid, yid = pnt
+  # deg_per_pix = 20/math.sqrt(H**2+W**2); # FIXME! degree to pixel transforms 
   D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
   D2fov_deg = D2fov * deg_per_pix
-  # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]) # maximal deviation at 4 corner
-  # maxecc = tf.reduce_max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]])
-  maxecc = max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]])
-  # e_r = maxecc; # 15
+  maxecc = math.sqrt(max(xid, W-xid)**2 + max(yid, H-yid)**2) * deg_per_pix # none tensor version
   if N_e is None:
-    N_e = np.ceil((np.log(maxecc)-np.log(e_o))/spacing+1).astype("int32")
-  rbf_basis = fov_rbf(D2fov_deg, spacing, e_o)
-  finalimg = tf.expand_dims(rbf_basis,-1)*img
+    N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing)) 
+  rbf_basis = fov_rbf(D2fov_deg,spacing,e_o)
+  finalimg = tf.expand_dims(rbf_basis, -1)*img
   for N in range(N_e):
     rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
     mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
+    # mean_dev = tf.exp(tf.math.log(e_o) + (tf.cast(N, tf.float32) + 1) * spacing)
     kerW = kerW_coef * mean_dev / deg_per_pix
     kerSz = int(kerW * 3)
+    # kerSz = tf.cast(kerW * 3, tf.int32)
     img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
-    finalimg = finalimg + tf.expand_dims(rbf_basis,-1)*img_gsft
+    finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
   return finalimg 
 
 
 import random
-def random_foveation(img, height, width, 
+def random_foveation(img, height, width, bdr=12, 
+                    kerW_coef=0.04,
+                    fov_area_ratio=0.1, 
+                    e_o=None, 
+                    spacing=0.3,
                     kerW_coef=0.04, 
-                    e_o=1, 
                     N_e=None, 
-                    spacing=0.3, 
-                    deg_per_pix = 0.03,
-                    bdr=12):
+                    deg_per_pix=0.03,):
   """Randomly apply `pntN` foveation transform to `img`. points are sampled uniformly in the center of 
   image after masking out the border `bdr` pixels.
 
@@ -545,92 +649,26 @@ def random_foveation(img, height, width,
   """
   # H, W = img.shape[0], img.shape[1] # if this is fixed then these two steps could be saved
   H, W = height, width
-  XX, YY = tf.meshgrid(tf.range(W),tf.range(H))
-  # deg_per_pix = 20/math.sqrt(H**2+W**2); # FIXME! degree to pixel transforms 
-  finimg_list = []
-  # xids = tf.random.uniform(shape=[1,], minval=bdr, maxval=W-bdr, dtype=tf.int32)
-  # yids = tf.random.uniform(shape=[1,], minval=bdr, maxval=H-bdr, dtype=tf.int32)
-  # xid, yid = xids[0], yids[0] # pixel coordinate of fixation point.
   xid = random.randint(bdr, W-bdr)
   yid = random.randint(bdr, H-bdr)
-  D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
-  D2fov_deg = D2fov * deg_per_pix
-  # maxecc = 10 $ fixed version
-  maxecc = math.sqrt(max(xid, W-xid)**2 + max(yid, H-yid)**2) * deg_per_pix # none tensor version
-  # maxecc = tf.sqrt(tf.cast(tf.square(tf.maximum(xid, W-xid)) + tf.square(tf.maximum(yid, H-yid)),tf.float32)) * deg_per_pix
-  e_r = maxecc; # 15
-  if N_e is None:
-    N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing+1)) #.astype("int32"
-    # N_e = tf.cast(tf.math.ceil(\
-    #     (tf.math.log(maxecc)-tf.math.log(tf.convert_to_tensor(e_o,dtype=tf.float32)))/spacing),tf.int32) # this is problematic
-  # spacing = tf.convert_to_tensor((math.log(e_r) - math.log(e_o)) / N_e);
-  # spacing = tf.convert_to_tensor(spacing, dtype="float32");
-  # e_o = tf.convert_to_tensor(e_o, dtype="float32");
-  rbf_basis = fov_rbf(D2fov_deg,spacing,e_o)
-  finalimg = tf.expand_dims(rbf_basis, -1)*img
-  for N in range(N_e):
-    rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
-    mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
-    # mean_dev = tf.exp(tf.math.log(e_o) + (tf.cast(N, tf.float32) + 1) * spacing)
-    kerW = kerW_coef * mean_dev / deg_per_pix
-    kerSz = int(kerW * 3)
-    # kerSz = tf.cast(kerW * 3, tf.int32)
-    img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
-    finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
-  #   finimg_list.append(finalimg)
-  # finimgs = tf.stack(finimg_list)
+  if fov_area_ratio is not None:
+    if type(fov_area_ratio) in [tuple, list]:
+      fov_area_r = random.uniform(fov_area_ratio[0], fov_area_ratio[1]) # should this ratio be uniform? 
+    else: 
+      fov_area_r = fov_area_ratio
+    fov_rad = math.sqrt(H * W * fov_area_r / math.pi)
+    fov_rad_deg = fov_rad * deg_per_pix
+  else: 
+    if e_o is not None:
+      fov_rad_deg = e_o
+    else:
+      raise ValueError
+
+  finalimg = FoveateAt(img, height, width, 
+              pnt=(xid, yid), 
+              e_o=fov_rad_deg, kerW_coef=kerW_coef, N_e=None, 
+              spacing=spacing, deg_per_pix=deg_per_pix,)
   return finalimg
-
-
-def random_foveation_multiple(img, 
-                    pntN:int =1, 
-                    kerW_coef=0.04, 
-                    e_o=1, 
-                    N_e=None, 
-                    spacing=0.3, 
-                    bdr=12):
-  """Randomly apply `pntN` foveation transform to `img`. points are sampled uniformly in the center of 
-  image after masking out the border `bdr` pixels.
-
-  Args: 
-    kerW_coef: how gaussian filtering kernel std scale as a function of eccentricity 
-    e_o: eccentricity of the initial ring belt
-    spacing: log scale spacing between eccentricity of ring belts. 
-    N_e: Number of ring belts in total. if None, it will calculate the N_e s.t. the whole image is covered by ring belts.
-    bdr: width (in pixel) of border region that forbid sampling (bias foveation point to be in the center of img)
-  """
-  H, W = img.shape[0], img.shape[1] # if this is fixed then these two steps could be saved
-  XX, YY = tf.meshgrid(tf.range(W),tf.range(H))
-  deg_per_pix = 0.03 #20/math.sqrt(H**2+W**2); # FIXME! degree to pixel transforms 
-  finimg_list = []
-  xids = tf.random.uniform(shape=[pntN,], minval=bdr, maxval=W-bdr, dtype=tf.int32)
-  yids = tf.random.uniform(shape=[pntN,], minval=bdr, maxval=H-bdr, dtype=tf.int32)
-  for it in range(pntN):
-    xid, yid = xids[it], yids[it] # pixel coordinate of fixation point.
-    D2fov = tf.sqrt(tf.cast(tf.square(XX - xid) + tf.square(YY - yid), 'float32'))
-    D2fov_deg = D2fov * deg_per_pix
-    # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1])
-    # maxecc = max(D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]) # maximal deviation at 4 corner
-    # maxecc = tf.reduce_max([D2fov_deg[0,0], D2fov_deg[-1,0], D2fov_deg[0,-1], D2fov_deg[-1,-1]]).eval() # just cannot get this work
-    maxecc = 10
-    e_r = maxecc; # 15
-    if N_e is None:
-      N_e = int(math.ceil((math.log(maxecc)-math.log(e_o))/spacing+1)) #.astype("int32"
-      # N_e = tf.cast(tf.math.ceil((tf.math.log(maxecc)-tf.math.log(e_o))/spacing+1),tf.int32) # this is problematic
-    # spacing = tf.convert_to_tensor((math.log(e_r) - math.log(e_o)) / N_e);
-    # spacing = tf.convert_to_tensor(spacing, dtype="float32");
-    rbf_basis = fov_rbf(D2fov_deg,spacing,e_o)
-    finalimg = tf.expand_dims(rbf_basis, -1)*img
-    for N in range(N_e):
-      rbf_basis = rbf(D2fov_deg, N, spacing, e_o=e_o)
-      mean_dev = math.exp(math.log(e_o) + (N + 1) * spacing)
-      kerW = kerW_coef * mean_dev / deg_per_pix
-      kerSz = int(kerW * 3)
-      img_gsft = tfa.image.gaussian_filter2d(img, filter_shape=(kerSz, kerSz), sigma=kerW, padding='REFLECT')
-      finalimg = finalimg + tf.expand_dims(rbf_basis, -1)*img_gsft
-    finimg_list.append(finalimg)
-  finimgs = tf.stack(finimg_list)
-  return finimgs
 
 
 def preprocess_for_train(image,
@@ -658,7 +696,8 @@ def preprocess_for_train(image,
     A preprocessed image `Tensor`.
   """
   if foveation:
-    image = random_foveation(image, height, width)
+    image = random_foveation(image, height, width, \
+        kerW_coef=FLAGS.blur_scaling, fov_area_ratio=FLAGS.fov_area_range)
   if crop:
     image = random_crop_with_resize(image, height, width)
   if flip:
